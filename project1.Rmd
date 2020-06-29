@@ -1,0 +1,292 @@
+---
+title: "econometrics_project"
+output: html_document
+---
+
+SECTION 1
+```{r}
+library (carData)
+library(dplyr)
+library(MASS)
+library(readxl)
+```
+STEP 1
+```{r}
+first_data <- Wong
+help(Wong)
+first_data$age <- as.integer(first_data$age)
+
+#cutting the data where duration of being in coma(in days) is greater than zero and where IQ was measured in 100 days after way out of coma
+wong1 <- subset(first_data, first_data$duration>0)
+wong2 <- subset(wong1, wong1$days < 100)
+
+plot(wong2$viq, wong2$piq, xlab = "Vocabulary IQ", ylab = "Mathematical IQ")
+abline(lm(wong2$piq ~ wong2$viq), col="blue")
+linm1 <- lm(wong2$piq ~ wong2$viq)
+summary(linm1)
+cor(wong2$piq, wong2$viq)
+```
+
+STEP 2
+```{r}
+data <- read_excel("VIQT_data.xls")
+
+#cutting the data of score_full distribution and multiplying by 1.2 to have the mean unchanged
+data$score_full <- data$score_full*1.2
+data0 <- subset(data, data$score_full>0)
+
+#cutting the data to have the right age
+data1 <- subset(data0, data0$age<100)
+
+#expressing IQ from score by the formula score*100/age and cutting the data to have right distribution
+data2 <- subset(data1, data1$score_full*100/data1$age<201)
+```
+
+STEP 3
+In this code we grouped people by the age - before 20 - from 20 to 25 - from 25 to 30 - and up to 60 like this - so we have 9 groups
+Then in each group we found the mean of IQ of people, who were in coma and of people who weren`t and found the differences between these means - You can see these differences plotted
+```{r}
+age <- c(25, 30, 35, 40, 45, 50, 55, 60)
+patient <- vector()
+people <- vector()
+difference <- vector()
+current_wong <- subset(wong2, wong2$age < 20)
+patient_mean <- mean(current_wong$viq)
+patient <- c(patient, patient_mean)
+current_data <- subset(data2, data2$age < 20)
+people_mean <- mean(current_data$score_full*100/current_data$age)
+people <- c(people, people_mean)
+difference <- c(difference, patient_mean - people_mean)
+for(time in 1:length(age)){
+  first <- age[time]
+  second <- first - 5
+  current_wong1 <- subset(wong2, wong2$age < first)
+  current_wong <- subset(current_wong1, current_wong1$age >= second)
+  patient_mean <- mean(current_wong$viq)
+  patient <- c(patient, patient_mean)
+  current_data <- subset(data2, data2$age < first)
+  current_data <- subset(current_data, current_data$age >= second)
+  people_mean <- mean(current_data$score_full*100/current_data$age)
+  people <- c(people, people_mean)
+  difference <- c(difference, patient_mean - people_mean)
+}
+age <- c(20, 25, 30, 35, 40, 45, 50, 55, 60)
+plot(y = difference,x = age, type = "l", col = "blue")
+```
+STEP 4
+```{r}
+#cutting the data where people were in coma and their IQ was measures no longer from coma than about 3 years
+second_data <- subset(first_data, first_data$duration>0)
+second_data <- subset(second_data, second_data$days<1000)
+
+#cutting the data and left there people, whose IQ was measured more than 1 time
+rep_pat = data.frame(with(second_data, table(id)))
+relevant_pat= subset(rep_pat , rep_pat$Freq>1)
+
+data = subset(second_data, second_data$id %in% relevant_pat$id)
+```
+
+STEP 5
+In this code we use the data with only patients, whose IQ was measured more than 1 time
+We groupped people by the age - before 20 - from 20 to 25 - from 25 to 30 - and up to 60 like this - so we have 9 groups
+1) For every patient we built the linear model - how her/his was recovering from coma - her/his IQ was measured several times during 3 years after getting out of a coma - how time influence on increasing of their IQ
+2) We found the mean coefficiens  of this influence in each of 9 groups and plotted it
+
+So on the plot You can see X - age, Y - how much time influences on increasing of IQ
+```{r}
+means <- vector()
+g20 <- subset(data, data$age<20)
+coef <- vector()
+data1 <- g20[!duplicated(g20$id),]
+for(n in 1:length(data1$id)){
+  my_data <- subset(g20, g20$id == data1$id[n])
+  model <- lm(my_data$viq ~ my_data$days)
+  coefficient <- as.numeric(model$coefficients[2])
+  coef = c(coef, coefficient)
+}
+means <- c(means, (mean(coef)))
+age <- c(25, 30, 35, 40, 45, 50, 54, 60)
+for(time in 1:length(age)){
+  first <- age[time]
+  second <- first - 5
+  g201 <- subset(data, data$age<first)
+  g20 <- subset(g201, g201$age>=second)
+  coef <- vector()
+  data1 <- g20[!duplicated(g20$id),]
+  for(n in 1:length(data1$id)){
+    my_data <- subset(g20, g20$id == data1$id[n])
+    model <- lm(my_data$viq ~ my_data$days)
+    coefficient <- as.numeric(model$coefficients[2])
+    coef = c(coef, coefficient)
+  }
+  means <- c(means, (mean(coef)))
+}
+age <- c(20, 25, 30, 35, 40, 45, 50, 54, 60)
+plot(y = means, x = age, type = "l", col= "blue")
+```
+
+STEP 6
+On this plot You can see how how the rate of exit from a coma and the size of the brain injury depends
+```{r}
+plot(means, difference)
+abline(lm(difference ~ means), col="blue")
+linearmod <- lm(difference ~ means)
+summary(linearmod)
+```
+
+
+SECTION 2
+
+STEP 1
+```{r}
+library(dplyr)
+library(LambertW)
+
+data <- read_excel("VIQT_data.xls")
+
+country_count = data.frame(with(data, table(country)))
+relevant_country = subset(country_count, country_count$Freq>30)
+#relevant country - country where were made more than 30 IQ tests
+
+data = subset(data, data$country %in% relevant_country$country) #cut countries with less then 30 survey
+data = subset (data, data$age > 5  & data$age< 80) #cut not relevant ages
+```
+
+
+STEP 2
+```{r}
+IQ = as.integer(data$score_full/data$age*100)
+plot(data$age, IQ, xlab="age")
+lines(lowess(data$age, IQ), col="blue") 
+# Counting IQ by formula and draw its plot
+
+plot( data$age, data$score_full, xlab="age", ylab="full score")
+lines(lowess( data$age, data$score_full), col="blue") 
+# Draw plot of dependence full score of age
+```
+
+STEP 3
+```{r}
+hist (IQ,  breaks=20)
+# Our IQ- distribunion looks like normal distribution, now we have ti check it
+
+qqnorm(IQ)
+qqline(IQ, col = "black", lwd = 3)
+# Draw QQline of our distribution and comrare it to normal distribution
+
+shapiro.test(IQ[1:5000])
+shapiro.test(IQ[5000:9915])
+# Devide our data on two groups and make a sharpio test for each of them
+
+ks.test.t(IQ)
+
+#Sharpio-Wilk test and Kolmogorov-Smirnov give as p-value less then 2,2e-16 
+# this mean that our data is perfectry Normally -distributed
+
+print(summary(IQ))
+print(sd(IQ))
+
+#distribution of our IQ is  a normal distribution with mean 102 and sd 46, it is close to the real IQ distribution
+
+data$IQ = IQ
+# add column IQ to our dataframe
+```
+
+STEP 4
+```{r}
+country_IQ =aggregate(data, by=list(data$country),FUN=mean, na.rm=TRUE)[c(1,133)]
+
+# We create a data_frame country_IQ with country and responsed mean IQ for it.
+
+gdp= read.csv('cor_gdp.csv')
+# cor_gdp.csv is a file with countries abbreviation and GDP per 2018 year
+
+IQ_GDP = merge(country_IQ, gdp,by.x = 'Group.1' ,by.y = 'Country', all=F)
+# We get intersect of country_IQ and gdp by Counrty
+
+IQ_GDP = IQ_GDP %>% 
+  rename(
+    Country= Group.1
+    )
+# rename column 
+
+print(IQ_GDP)
+```
+
+STEP 5
+```{r}
+plot(IQ_GDP$IQ, IQ_GDP$GDP, xlab="IQ", ylab = "GDP")
+abline(lm(IQ_GDP$GDP~ IQ_GDP$IQ), col="blue")
+# Now we don't see significant correlation
+
+IQ_GDP$logged_GDP = log(IQ_GDP$GDP)
+
+plot(IQ_GDP$IQ, IQ_GDP$logged_GDP, xlab="IQ", ylab = "logged_GDP")
+abline(lm(IQ_GDP$logged_GDP~ IQ_GDP$IQ), col="blue")
+# This way correlation is more clear because GDP is really big when average IQ doesn't have a bit range
+
+cor(IQ_GDP$IQ, IQ_GDP$GDP)
+cor(IQ_GDP$IQ, IQ_GDP$logged_GDP)
+# Correlations equal to  0.3087967 and 0.4402467
+
+print(summary(lm(IQ_GDP$GDP ~ IQ_GDP$IQ)))
+print(summary(lm(IQ_GDP$logged_GDP ~ IQ_GDP$IQ)))
+
+#Using lm we can see that GDP is statistically significant for IQ
+```
+
+STEP 6
+```{r}
+data = subset(data, data$gender ==2 | data$gender ==1) #cut third gender for relevant lm 
+
+X <- model.matrix(~0+ engnat + education + urban + gender, data = data)
+cor(X)
+# We test our factors for dependence, aswe can see, variables are not dependent
+# There is a slight correlation between urban and not native English, it means that most of the foreigners were taken from cities
+
+
+print(summary(lm( IQ ~ engnat + education + urban + gender, data=data)))
+
+# We can see, that engnat, education and gender impacts IQ 
+# gender : boy's IQ is higher 
+# people, whos native language was English passed the test much better
+# and we can determinate that higher education level leads to lover IQ
+# urbanization doesnt impact IQ
+```
+
+STEP 7
+```{r}
+X <- model.matrix(~0+S1+S2+S3+S4+S5+S6+S7+S8+S9+S10+S11+S12+S13+S14+S15+S16+S17+S18+S19+S20+S21+S22+S23+S24+S25+S26+S27+S28+S29+S30, data = data)
+X=cor(X)
+print(X)
+# Let's test our questions for independense 
+# Here is questions with correlation bigger, than 0,3 (20~26 = 0,41), (12~6 = 0,44), (2~4 = 0,5), (12~16 = 0,35) (14~13 = 0,33), (18~20 = 0,42)
+
+model1 = lm(IQ~S1+S2+S3+S4+S5+S6+S7+S8+S9+S10+S11+S12+S13+S14+S15+S16+S17+S18+S19+S20+S21+S22+S23+S24+S25+S26+S27+S28+S29+S30, data= data)
+step <- stepAIC(model1, direction="both", k=31)
+step$anova # display results
+# ve use variable selection to delete urrelevant variables from our model
+# Final Model (only relevant):
+#IQ ~ S3 + S6 + S8 + S9 + S10 + S11 + S12 + S13 + S15 + S16 + 
+#    S17 + S18 + S19 + S20 + S21 + S22 + S23 + S25 + S26 + S27 + 
+#    S28 + S29 + S30
+
+model2 = lm (IQ ~  S3 + S9 + S10 + S12 + S13 + S18 + S19 + S20 + S21 + S22 +  S25 + S27 + S28 + S29 + S30, data = data)
+print(summary(model2))
+
+# As we can see, reliable questions are S3, S9 , S10 , S12 , S13 , S18 , S19 , S20 , S21 , S22 , S25 ,  S27 , S28 , S29 , S30 
+# We exclude hightly correlated (26, 18, 6, 16, 14) and get S3, S9 , S10 , S12 , S19 , S20 , S21 , S22 , S25 ,S27 , S28 , S29 , S30 
+
+# Here are some graffics of them
+plot(data$S25, data$IQ, main ="I wish people were more spiritual", xlab="S9", ylab="IQ", ylim = c(0, 200))
+lines(lowess(data$S25, data$IQ), col="blue") 
+
+plot(data$S20, data$IQ, main ="I do more than someone expected of me.", xlab="S20", ylab="IQ", ylim = c(0, 200))
+lines(lowess(data$S20, data$IQ), col="blue") 
+
+plot(data$S30, data$IQ, main ="I am not quite sure what I want.", xlab="S30", ylab="IQ", ylim = c(0, 200))
+lines(lowess(data$S30, data$IQ), col="blue") 
+
+plot(data$S19, data$IQ, main ="I do not have a very expressive face.", xlab="S19", ylab="IQ", ylim = c(0, 200))
+lines(lowess(data$S19, data$IQ), col="blue")
+```
